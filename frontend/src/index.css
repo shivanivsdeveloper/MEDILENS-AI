@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #030712;
+    color: #F8FAFC;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+/* Custom Institutional Glass & Radiographic Styling */
+.spatial-glass {
+  background: rgba(11, 19, 43, 0.70);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.spatial-glass-subtle {
+  background: rgba(14, 26, 56, 0.50);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.radiograph-viewport {
+  background: radial-gradient(circle at center, #0B132B 0%, #030712 100%);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.85);
+}
+
+/* Scanline animation */
+.scanline-sweep {
+  background: linear-gradient(
+    to bottom,
+    transparent 50%,
+    rgba(0, 242, 254, 0.08) 51%,
+    rgba(0, 242, 254, 0.25) 52%,
+    transparent 55%
+  );
+  background-size: 100% 200%;
+  animation: scanlines 4s linear infinite;
+}
+
+@keyframes scanlines {
+  0% { background-position: 0 0%; }
+  100% { background-position: 0 200%; }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #030712;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1E293B;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #38BDF8;
+}
