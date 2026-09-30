@@ -1,8 +1,15 @@
 {
-  "venvPath": "backend",
-  "venv": ".venv",
+  "venvPath": ".",
+  "venv": "backend/.venv",
   "extraPaths": [
     ".",
-    "backend"
-  ]
+    "backend",
+    "backend/.venv/Lib/site-packages"
+  ],
+  "include": [
+    "backend",
+    "train_models.py"
+  ],
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none"
 }
