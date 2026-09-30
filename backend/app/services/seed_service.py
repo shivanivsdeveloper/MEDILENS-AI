@@ -1,113 +1,48 @@
 import os
 import shutil
-import cv2
 import json
-import numpy as np
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from backend.app.config.settings import settings
 from backend.app.models.entities import Patient, Scan, AnalysisResult, ModelEntry, Experiment, ReviewRecord, AuditLog
-from backend.app.ml.preprocessing.quality_engine import ImageQualityEngine
-from backend.app.ml.modality_detector import ModalityDetector
-from backend.app.ml.registry.model_registry import model_registry
-
 from backend.app.services.auth_service import AuthService
 
 class SeedService:
     @staticmethod
     def create_sample_images():
         """
-        Creates synthetic radiographic patterns for out-of-the-box exploration.
+        Creates lightweight sample image files for demo purposes if not present.
         """
         sample_dir = settings.SAMPLE_DIR
         sample_dir.mkdir(parents=True, exist_ok=True)
 
-        # 1. Chest X-Ray Normal
-        cxr_normal_path = sample_dir / "sample_cxr_normal.png"
-        if not cxr_normal_path.exists():
-            img = np.zeros((512, 512, 3), dtype=np.uint8)
-            # Background thorax gradient
-            y, x = np.ogrid[:512, :512]
-            thorax = np.exp(-((x - 256)**2 / 35000 + (y - 256)**2 / 45000))
-            gray = np.uint8(thorax * 180)
-            
-            # Left & Right lung dark cavities
-            lung_l = np.exp(-((x - 170)**2 / 4500 + (y - 240)**2 / 12000))
-            lung_r = np.exp(-((x - 342)**2 / 4500 + (y - 240)**2 / 12000))
-            gray = np.uint8(np.clip(gray - (lung_l * 120) - (lung_r * 120), 10, 240))
-            
-            # Rib cage arcs
-            for r_y in range(120, 420, 45):
-                cv2.ellipse(gray, (256, r_y), (180, 40), 0, 0, 180, 140, 2)
-            
-            # Spine & mediastinum
-            cv2.line(gray, (256, 60), (256, 480), 200, 18)
-            # Heart shadow
-            cv2.ellipse(gray, (290, 280), (60, 45), 30, 0, 360, 175, -1)
-            
-            blurred = cv2.GaussianBlur(gray, (7, 7), 0)
-            cv2.imwrite(str(cxr_normal_path), cv2.cvtColor(blurred, cv2.COLOR_GRAY2BGR))
+        sample_files = [
+            "sample_cxr_pneumonia.png",
+            "sample_cxr_normal.png",
+            "sample_retinal_fundus.png",
+            "sample_skin_lesion.png",
+            "sample_brain_mri.png"
+        ]
 
-        # 2. Chest X-Ray Infiltration / Pneumonia
-        cxr_pneumonia_path = sample_dir / "sample_cxr_pneumonia.png"
-        if not cxr_pneumonia_path.exists():
-            base_img = cv2.imread(str(cxr_normal_path), cv2.IMREAD_GRAYSCALE)
-            # Add focal dense opacity in right lower lobe
-            y, x = np.ogrid[:512, :512]
-            focal_opacity = np.exp(-((x - 180)**2 / 1800 + (y - 300)**2 / 2400))
-            dense_gray = np.uint8(np.clip(base_img + (focal_opacity * 130), 0, 255))
-            cv2.imwrite(str(cxr_pneumonia_path), cv2.cvtColor(dense_gray, cv2.COLOR_GRAY2BGR))
+        # 1x1 minimal transparent PNG byte header fallback if file not on disk
+        minimal_png = (
+            b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x01\x00\x00\x00\x01\x00'
+            b'\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\xff\xff'
+            b'?\x00\x05\xfe\x02\xfe\r\xef\x8f\x8d\x00\x00\x00\x00IEND\xaeB`\x82'
+        )
 
-        # 3. Retinal Fundus Image
-        retinal_path = sample_dir / "sample_retinal_fundus.png"
-        if not retinal_path.exists():
-            img = np.zeros((512, 512, 3), dtype=np.uint8)
-            # Circular fundus aperture
-            cv2.circle(img, (256, 256), 235, (30, 60, 200), -1)  # BGR: Red/Orange base
-            # Macula (dark central spot)
-            cv2.circle(img, (290, 256), 28, (15, 35, 140), -1)
-            # Optic Disc (bright yellowish disc)
-            cv2.circle(img, (180, 256), 34, (80, 200, 245), -1)
-            # Vascular branch arcades
-            for angle in [0.3, 0.8, -0.4, -0.9]:
-                cv2.ellipse(img, (180, 256), (120, 70), angle * 50, 0, 140, (15, 25, 110), 3)
-            # Subtle exudate lesions
-            cv2.circle(img, (320, 220), 6, (120, 240, 255), -1)
-            cv2.circle(img, (340, 235), 4, (120, 240, 255), -1)
-            cv2.imwrite(str(retinal_path), img)
-
-        # 4. Skin Lesion (Dermoscopy)
-        skin_path = sample_dir / "sample_skin_lesion.png"
-        if not skin_path.exists():
-            img = np.ones((512, 512, 3), dtype=np.uint8) * 190
-            img[:, :, 2] = 220  # Peach skin tone
-            img[:, :, 0] = 160
-            # Asymmetrical atypical melanocytic pigment network
-            cv2.ellipse(img, (256, 256), (110, 85), 25, 0, 360, (40, 50, 80), -1)
-            cv2.ellipse(img, (270, 240), (55, 45), -15, 0, 360, (20, 25, 40), -1)
-            # Blur boundaries
-            img = cv2.GaussianBlur(img, (15, 15), 0)
-            cv2.imwrite(str(skin_path), img)
-
-        # 5. Brain MRI Axial Slice
-        brain_path = sample_dir / "sample_brain_mri.png"
-        if not brain_path.exists():
-            img = np.zeros((512, 512), dtype=np.uint8)
-            # Skull contour
-            cv2.ellipse(img, (256, 256), (190, 220), 0, 0, 360, 210, 8)
-            # Brain parenchyma
-            cv2.ellipse(img, (256, 256), (175, 205), 0, 0, 360, 120, -1)
-            # Bilateral ventricles
-            cv2.ellipse(img, (235, 250), (16, 50), -10, 0, 360, 20, -1)
-            cv2.ellipse(img, (277, 250), (16, 50), 10, 0, 360, 20, -1)
-            # Glioma hyperintensity region in temporal lobe
-            cv2.circle(img, (340, 270), 30, 230, -1)
-            img = cv2.GaussianBlur(img, (5, 5), 0)
-            cv2.imwrite(str(brain_path), cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
+        for s_file in sample_files:
+            file_path = sample_dir / s_file
+            if not file_path.exists():
+                with open(file_path, "wb") as f:
+                    f.write(minimal_png)
 
     @staticmethod
     def seed_initial_data(db: Session):
+        """
+        Populates initial database entries cleanly without loading ML models or running inference.
+        """
         SeedService.create_sample_images()
         AuthService.seed_users(db)
 
@@ -300,93 +235,127 @@ class SeedService:
                 db.add(p)
             db.commit()
 
-        # 4. Ingest Sample Scans if Scans table is empty
+        # 4. Seed Scans with pre-calculated static analysis metadata (Zero live inference during startup)
         if db.query(Scan).count() == 0:
             p_list = db.query(Patient).all()
-            sample_files = [
-                ("sample_cxr_pneumonia.png", p_list[0].id if p_list else None, "Chest X-ray"),
-                ("sample_cxr_normal.png", p_list[0].id if p_list else None, "Chest X-ray"),
-                ("sample_retinal_fundus.png", p_list[1].id if len(p_list) > 1 else None, "Retinal Fundus"),
-                ("sample_skin_lesion.png", p_list[2].id if len(p_list) > 2 else None, "Skin Lesion"),
-                ("sample_brain_mri.png", p_list[3].id if len(p_list) > 3 else None, "Brain MRI")
+            sample_specs = [
+                {
+                    "file": "sample_cxr_pneumonia.png",
+                    "p_id": p_list[0].id if p_list else None,
+                    "mod": "Chest X-ray",
+                    "pred": "Pneumonia",
+                    "conf": 0.942,
+                    "risk": "High",
+                    "rationale": "High confidence opacity detected in lower thoracic quadrant."
+                },
+                {
+                    "file": "sample_cxr_normal.png",
+                    "p_id": p_list[0].id if p_list else None,
+                    "mod": "Chest X-ray",
+                    "pred": "Normal",
+                    "conf": 0.965,
+                    "risk": "Low",
+                    "rationale": "No focal consolidation or radiographic pathology identified."
+                },
+                {
+                    "file": "sample_retinal_fundus.png",
+                    "p_id": p_list[1].id if len(p_list) > 1 else None,
+                    "mod": "Retinal Fundus",
+                    "pred": "Diabetic Retinopathy",
+                    "conf": 0.887,
+                    "risk": "Moderate",
+                    "rationale": "Microvascular anomalies detected in parafoveal retina."
+                },
+                {
+                    "file": "sample_skin_lesion.png",
+                    "p_id": p_list[2].id if len(p_list) > 2 else None,
+                    "mod": "Skin Lesion",
+                    "pred": "Melanoma",
+                    "conf": 0.891,
+                    "risk": "High",
+                    "rationale": "Asymmetrical pigment network and irregular border distribution."
+                },
+                {
+                    "file": "sample_brain_mri.png",
+                    "p_id": p_list[3].id if len(p_list) > 3 else None,
+                    "mod": "Brain MRI",
+                    "pred": "Glioma",
+                    "conf": 0.915,
+                    "risk": "High",
+                    "rationale": "Hyperintense mass with surrounding vasogenic edema in temporal parenchyma."
+                }
             ]
 
-            for s_file, p_id, mod in sample_files:
+            for s_spec in sample_specs:
+                s_file = s_spec["file"]
                 src_path = settings.SAMPLE_DIR / s_file
-                if not src_path.exists():
-                    continue
-
                 scan_uid = f"SCN-{s_file.split('.')[0][-8:].upper()}"
                 dest_path = settings.UPLOAD_DIR / f"{scan_uid}.png"
-                shutil.copyfile(str(src_path), str(dest_path))
 
-                q_score, q_cat, q_meta = ImageQualityEngine.assess_quality(str(dest_path))
-                det_mod, mod_conf, mod_meta = ModalityDetector.detect_modality(str(dest_path))
+                if src_path.exists() and not dest_path.exists():
+                    shutil.copyfile(str(src_path), str(dest_path))
+
+                file_size = os.path.getsize(dest_path) if dest_path.exists() else 1024
 
                 scan = Scan(
-                    patient_id=p_id,
+                    patient_id=s_spec["p_id"],
                     scan_uid=scan_uid,
                     file_name=f"{scan_uid}.png",
                     file_path=str(dest_path),
                     original_file_name=s_file,
-                    file_size_bytes=os.path.getsize(dest_path),
+                    file_size_bytes=file_size,
                     file_format="PNG",
-                    detected_modality=mod,
-                    modality_confidence=mod_conf,
-                    quality_score=q_score,
-                    quality_category=q_cat,
-                    quality_metrics=json.dumps(q_meta),
-                    status="Uploaded",
+                    detected_modality=s_spec["mod"],
+                    modality_confidence=0.95,
+                    quality_score=88.5,
+                    quality_category="Good",
+                    quality_metrics=json.dumps({"sharpness": 88.5, "noise_level": "Low", "contrast": "High"}),
+                    status="Completed",
                     is_synthetic_demo=True,
-                    created_at=datetime.utcnow() - timedelta(days=np.random.randint(0, 5), hours=np.random.randint(1, 12))
+                    created_at=datetime.utcnow() - timedelta(days=2)
                 )
                 db.add(scan)
                 db.commit()
                 db.refresh(scan)
 
-                # Run initial AI inference on seed scans
-                module = model_registry.get_module_for_modality(scan.detected_modality)
-                if module:
-                    pred_dict = module.predict(scan.file_path, quality_score=scan.quality_score)
-                    analysis = AnalysisResult(
-                        scan_id=scan.id,
-                        model_name=pred_dict["model_name"],
-                        model_version=pred_dict["model_version"],
-                        modality=pred_dict["modality"],
-                        predicted_label=pred_dict["predicted_label"],
-                        probability=pred_dict["probability"],
-                        confidence_score=pred_dict["confidence_score"],
-                        uncertainty_score=pred_dict["uncertainty_score"],
-                        entropy=pred_dict["entropy"],
-                        is_ood=pred_dict["is_ood"],
-                        ood_score=pred_dict["ood_score"],
-                        risk_indicator=pred_dict["risk_indicator"],
-                        risk_rationale=pred_dict["risk_rationale"],
-                        heatmap_path=pred_dict["heatmap_path"],
-                        elevation_data_path=json.dumps(pred_dict["elevation_grid"]),
-                        segmentation_mask_path=pred_dict["segmentation_mask_path"],
-                        measurements=json.dumps(pred_dict["measurements"]),
-                        all_predictions=json.dumps(pred_dict["all_predictions"]),
-                        ensemble_agreement=json.dumps(pred_dict["ensemble_agreement"]),
-                        inference_time_ms=pred_dict["inference_time_ms"],
-                        is_demo_mode=pred_dict["is_demo_mode"],
-                        safety_disclaimer=pred_dict["safety_disclaimer"]
-                    )
-                    db.add(analysis)
-                    scan.status = "Completed"
-                    db.commit()
+                # Pre-populated static analysis record
+                analysis = AnalysisResult(
+                    scan_id=scan.id,
+                    model_name=f"{s_spec['mod']} Screening Suite",
+                    model_version="2.4.1",
+                    modality=s_spec["mod"],
+                    predicted_label=s_spec["pred"],
+                    probability=s_spec["conf"],
+                    confidence_score=s_spec["conf"],
+                    uncertainty_score=round(1.0 - s_spec["conf"], 3),
+                    entropy=0.18,
+                    is_ood=False,
+                    ood_score=0.08,
+                    risk_indicator=s_spec["risk"],
+                    risk_rationale=s_spec["rationale"],
+                    heatmap_path=None,
+                    elevation_data_path=json.dumps([]),
+                    segmentation_mask_path=None,
+                    measurements=json.dumps({"percentage_of_image": 11.5, "total_regions_count": 1}),
+                    all_predictions=json.dumps([{"label": s_spec["pred"], "probability": s_spec["conf"]}]),
+                    ensemble_agreement=json.dumps({"consensus_ratio": 0.95, "dispute_level": "Low"}),
+                    inference_time_ms=65.0,
+                    is_demo_mode=True,
+                    safety_disclaimer="AI screening decision-support aid. Not a definitive medical diagnosis."
+                )
+                db.add(analysis)
+                db.commit()
 
-                    # Add Seed Review Record for some scans
-                    if scan.scan_uid.endswith("MONIA"):
-                        rev = ReviewRecord(
-                            scan_id=scan.id,
-                            analysis_id=analysis.id,
-                            reviewer_name="Dr. S. Clinical Radiologist",
-                            reviewer_role="Lead Radiologist",
-                            decision="Accepted",
-                            original_label=analysis.predicted_label,
-                            clinical_notes="Focal consolidation identified in the lower right lobe. Prescribed targeted antibiotic therapy.",
-                            reviewed_at=datetime.utcnow()
-                        )
-                        db.add(rev)
-                        db.commit()
+                if "PNEUMONIA" in scan.scan_uid or "MONIA" in scan.scan_uid:
+                    rev = ReviewRecord(
+                        scan_id=scan.id,
+                        analysis_id=analysis.id,
+                        reviewer_name="Dr. S. Clinical Radiologist",
+                        reviewer_role="Lead Radiologist",
+                        decision="Accepted",
+                        original_label=analysis.predicted_label,
+                        clinical_notes="Focal consolidation identified in the lower right lobe. Prescribed targeted antibiotic therapy.",
+                        reviewed_at=datetime.utcnow()
+                    )
+                    db.add(rev)
+                    db.commit()

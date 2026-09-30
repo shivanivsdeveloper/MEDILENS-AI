@@ -10,10 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.config.settings import settings
 from backend.app.models.entities import Scan, AnalysisResult, Patient, AuditLog, ReviewRecord
-from backend.app.ml.preprocessing.quality_engine import ImageQualityEngine
-from backend.app.ml.modality_detector import ModalityDetector
-from backend.app.ml.registry.model_registry import model_registry
-from backend.app.reports.pdf_generator import PDFReportGenerator
+import gc
 
 class ScanService:
     @staticmethod
@@ -39,6 +36,9 @@ class ScanService:
         file_size = os.path.getsize(saved_path)
 
         # 3. Assess image quality
+        from backend.app.ml.preprocessing.quality_engine import ImageQualityEngine
+        from backend.app.ml.modality_detector import ModalityDetector
+
         quality_score, quality_cat, quality_meta = ImageQualityEngine.assess_quality(str(saved_path))
 
         # 4. Detect modality
@@ -84,6 +84,8 @@ class ScanService:
         if not scan:
             raise HTTPException(status_code=404, detail="Scan not found")
 
+        from backend.app.ml.registry.model_registry import model_registry
+
         # Select module
         if model_id:
             module = model_registry.get_module_by_id(model_id)
@@ -95,6 +97,7 @@ class ScanService:
 
         # Execute ML inference
         pred_dict = module.predict(image_path=scan.file_path, quality_score=scan.quality_score)
+        gc.collect()
 
         # Check existing analysis
         existing = db.query(AnalysisResult).filter(AnalysisResult.scan_id == scan_id).first()
@@ -150,6 +153,8 @@ class ScanService:
         scan = db.query(Scan).filter(Scan.id == scan_id).first()
         if not scan or not scan.analysis:
             raise HTTPException(status_code=400, detail="Scan has not undergone AI screening yet.")
+
+        from backend.app.reports.pdf_generator import PDFReportGenerator
 
         analysis = scan.analysis
         patient = scan.patient

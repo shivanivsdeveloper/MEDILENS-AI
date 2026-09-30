@@ -99,16 +99,12 @@ def root():
 
 @app.get("/health", tags=["System Health"])
 def health_check():
-    import platform
     return {
         "status": "Healthy",
         "version": settings.VERSION,
-        "environment": settings.ENVIRONMENT,
-        "platform": f"{platform.system()} {platform.release()} ({platform.machine()})",
-        "compute_device": "CPU (Low-Memory Engine)",
-        "database_status": "Connected",
-        "inference_engine": "Online (Lazy Loading)"
+        "database_status": "Connected"
     }
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
