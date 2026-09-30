@@ -4,11 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from backend.app.models.database import get_db
 from backend.app.models.entities import Scan, Patient, AnalysisResult, CaseEmbedding
-from backend.app.ml.embeddings.embedding_engine import EmbeddingUniverseEngine
-from backend.app.ml.embeddings.similarity_search import SimilarCaseRetrievalEngine
-from backend.app.ml.digital_twin.longitudinal_engine import LongitudinalEngine
-from backend.app.ml.digital_twin.progression_simulator import DiseaseProgressionSimulator
-from backend.app.ml.agents.orchestrator import MultiAgentOrchestrator
 
 router = APIRouter(prefix="/research", tags=["Research & Intelligence"])
 
@@ -18,6 +13,7 @@ def get_embedding_universe(db: Session = Depends(get_db)):
     Returns 2D & 3D manifold embeddings for all scans in the repository
     along with unsupervised cluster assignments and outlier indices.
     """
+    from backend.app.ml.embeddings.embedding_engine import EmbeddingUniverseEngine
     scans = db.query(Scan).filter(Scan.status == "Completed").all()
     if not scans:
         scans = db.query(Scan).all()
@@ -100,6 +96,8 @@ def get_similar_cases(scan_id: int, top_k: int = Query(4, ge=1, le=10), db: Sess
     Performs vector cosine similarity search to retrieve the most visually and
     structurally congruent historical cases in the repository.
     """
+    from backend.app.ml.embeddings.embedding_engine import EmbeddingUniverseEngine
+    from backend.app.ml.embeddings.similarity_search import SimilarCaseRetrievalEngine
     target_scan = db.query(Scan).filter(Scan.id == scan_id).first()
     if not target_scan:
         raise HTTPException(status_code=404, detail="Scan not found")
@@ -159,6 +157,7 @@ def get_patient_digital_twin(patient_id: int, db: Session = Depends(get_db)):
     Retrieves chronological patient imaging timeline, generates visual difference
     heatmaps between consecutive visits, and computes structural stability indices.
     """
+    from backend.app.ml.digital_twin.longitudinal_engine import LongitudinalEngine
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
@@ -226,6 +225,7 @@ def get_disease_progression_simulation(patient_id: int, horizon_months: int = Qu
     """
     Simulates disease trajectory and lesion area trends based on historical patient scans.
     """
+    from backend.app.ml.digital_twin.progression_simulator import DiseaseProgressionSimulator
     scans = db.query(Scan).filter(Scan.patient_id == patient_id).order_by(Scan.created_at.asc()).all()
     
     historical_points = []
@@ -261,6 +261,7 @@ def run_multi_agent_orchestration(scan_id: int, db: Session = Depends(get_db)):
     Runs full multi-agent orchestration across Vision, Quality, Anomaly,
     Classification, Segmentation, Explainability, Safety, and Review agents.
     """
+    from backend.app.ml.agents.orchestrator import MultiAgentOrchestrator
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")

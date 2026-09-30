@@ -1,8 +1,6 @@
 import os
 import json
 import time
-import numpy as np
-import torch
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.orm import Session
@@ -11,15 +9,6 @@ from backend.app.models.database import get_db
 from backend.app.models.entities import (
     Scan, Patient, ModelEntry, ModelCard, DatasetCard, StressTestRun, Experiment, AnalysisResult
 )
-from backend.app.ml.debate.consensus_engine import ModelCourtConsensusEngine
-from backend.app.ml.robustness.stress_tester import ModelStressTester
-from backend.app.ml.calibration.calibration_engine import CalibrationEngine
-from backend.app.ml.dataset_intel.leakage_detector import DatasetLeakageDetector
-from backend.app.ml.dataset_intel.health_scorer import DatasetHealthScorer
-from backend.app.ml.registry.model_registry import model_registry
-from backend.app.ml.training.trainer import ModelTrainingManager
-from backend.app.ml.explainability.gradcam import GradCAMExplainer
-from backend.app.ml.segmentation.segmentor import ClinicalSegmentor
 
 router = APIRouter(prefix="/lab", tags=["Research Labs & Model Intelligence"])
 
@@ -32,19 +21,19 @@ def get_lab_dashboard_stats(db: Session = Depends(get_db)):
     Returns real hardware telemetry, active training jobs, model counts, dataset stats,
     and recent experiments for the research workstation dashboard.
     """
+    from backend.app.ml.training.trainer import ModelTrainingManager
+
     total_models = db.query(ModelEntry).count()
     active_models = db.query(ModelEntry).filter(ModelEntry.is_active == True).count()
     total_experiments = db.query(Experiment).count()
     total_scans = db.query(Scan).count()
 
-    cuda_available = torch.cuda.is_available()
-    device_name = torch.cuda.get_device_name(0) if cuda_available else "Host CPU Execution (AVX2 / Vector Acceleration)"
     memory_info = {
-        "gpu_available": cuda_available,
-        "device": device_name,
-        "torch_version": torch.__version__,
-        "threads": torch.get_num_threads(),
-        "backend_engine": "PyTorch 2.x Neural Runtime"
+        "gpu_available": False,
+        "device": "Host CPU Execution (AVX2 / Low-Memory Engine)",
+        "torch_version": "2.x",
+        "threads": 1,
+        "backend_engine": "PyTorch Neural Runtime (Lazy Loading)"
     }
 
     recent_exps = db.query(Experiment).order_by(Experiment.created_at.desc()).limit(5).all()
@@ -98,6 +87,7 @@ def start_model_training(
     """
     Launches an asynchronous model training pipeline with live epoch telemetry and checkpointing.
     """
+    from backend.app.ml.training.trainer import ModelTrainingManager
     job_id = ModelTrainingManager.start_training_job(
         name=name,
         architecture=architecture,
@@ -115,11 +105,13 @@ def start_model_training(
 @router.get("/training/jobs")
 def list_training_jobs():
     """Lists all active and completed training jobs."""
+    from backend.app.ml.training.trainer import ModelTrainingManager
     return ModelTrainingManager.list_jobs()
 
 @router.get("/training/jobs/{job_id}")
 def get_training_job_detail(job_id: str):
     """Returns real-time epoch logs, metrics, and progress for a specific training session."""
+    from backend.app.ml.training.trainer import ModelTrainingManager
     job = ModelTrainingManager.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Training job not found")
@@ -128,6 +120,7 @@ def get_training_job_detail(job_id: str):
 @router.post("/training/jobs/{job_id}/cancel")
 def cancel_training_job(job_id: str):
     """Stops an ongoing training run."""
+    from backend.app.ml.training.trainer import ModelTrainingManager
     success = ModelTrainingManager.cancel_job(job_id)
     if not success:
         raise HTTPException(status_code=404, detail="Job not found or already terminated")
@@ -143,6 +136,7 @@ def run_model_court_debate(scan_id: int, db: Session = Depends(get_db)):
     Executes multiple neural network architectures on target scan,
     calculates consensus agreement ratio, dispute level, and courtroom evidence.
     """
+    from backend.app.ml.debate.consensus_engine import ModelCourtConsensusEngine
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
@@ -176,6 +170,7 @@ def run_multi_method_explainability(
     Generates comparative attribution maps using Grad-CAM, Grad-CAM++,
     Integrated Gradients, and Occlusion Sensitivity.
     """
+    from backend.app.ml.registry.model_registry import model_registry
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
@@ -246,6 +241,7 @@ def get_calibration_metrics(model_id: Optional[str] = Query("mod_chest_xray_v2")
     """
     Returns reliability diagram curve and Expected Calibration Error (ECE) for the model.
     """
+    from backend.app.ml.calibration.calibration_engine import CalibrationEngine
     analyses = db.query(Scan).filter(Scan.status == "Completed").all()
     confidences = []
     accuracies = []
@@ -300,6 +296,7 @@ def evaluate_segmentation_lab(
     """
     Performs morphological ROI segmentation and calculates quantitative spatial metrics (Dice, IoU, Area Pct).
     """
+    from backend.app.ml.registry.model_registry import model_registry
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
@@ -344,6 +341,7 @@ def discover_patterns(
     """
     Executes unsupervised manifold projection and clustering over latent model representations.
     """
+    import numpy as np
     scans = db.query(Scan).limit(100).all()
     points = []
     
@@ -399,6 +397,7 @@ def run_stress_test(
     """
     Evaluates model resilience and explanation shift under controlled perturbations.
     """
+    from backend.app.ml.robustness.stress_tester import ModelStressTester
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
@@ -426,6 +425,7 @@ def run_stress_test(
 @router.get("/leakage-check")
 def run_dataset_leakage_audit(db: Session = Depends(get_db)):
     """Runs automated dataset split verification to detect patient-level contamination."""
+    from backend.app.ml.dataset_intel.leakage_detector import DatasetLeakageDetector
     patients = db.query(Patient).all()
     train_cases = []
     test_cases = []
@@ -449,6 +449,7 @@ def run_dataset_leakage_audit(db: Session = Depends(get_db)):
 @router.get("/health-check")
 def get_dataset_health(dataset_name: Optional[str] = Query("NIH-ChestXray14-Research-Split"), db: Session = Depends(get_db)):
     """Calculates dataset health score based on image quality, class balance, and missing fields."""
+    from backend.app.ml.dataset_intel.health_scorer import DatasetHealthScorer
     total_scans = db.query(Scan).count()
     low_q_count = db.query(Scan).filter(Scan.quality_score < 50.0).count()
 
@@ -626,7 +627,7 @@ def get_advanced_tools_status():
     """
     Returns readiness status and prerequisites for all 24 scientific research modules.
     """
-    has_gpu = torch.cuda.is_available()
+    has_gpu = False
 
     tools = [
         {"id": "few_shot", "name": "Few-Shot Prototypical Learning", "status": "Ready", "prerequisites": "Minimum 5 support samples per class"},

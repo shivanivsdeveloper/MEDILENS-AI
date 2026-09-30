@@ -7,17 +7,6 @@ project_root = Path(__file__).resolve().parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-# Configure lightweight PyTorch CPU execution for 512 MB memory constraint
-try:
-    import torch
-    torch.set_num_threads(1)
-    try:
-        torch.set_num_interop_threads(1)
-    except Exception:
-        pass
-except Exception:
-    pass
-
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
