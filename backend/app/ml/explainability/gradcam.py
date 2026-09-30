@@ -17,6 +17,8 @@ class GradCAMExplainer:
         self.target_layer = target_layer
         self.activations = None
         self.gradients = None
+        self._forward_handle = None
+        self._backward_handle = None
         self._register_hooks()
 
     def _register_hooks(self):
@@ -26,8 +28,20 @@ class GradCAMExplainer:
         def backward_hook(module, grad_in, grad_out):
             self.gradients = grad_out[0].detach()
 
-        self.target_layer.register_forward_hook(forward_hook)
-        self.target_layer.register_full_backward_hook(backward_hook)
+        self._forward_handle = self.target_layer.register_forward_hook(forward_hook)
+        self._backward_handle = self.target_layer.register_full_backward_hook(backward_hook)
+
+    def cleanup(self):
+        if self._forward_handle is not None:
+            self._forward_handle.remove()
+            self._forward_handle = None
+        if self._backward_handle is not None:
+            self._backward_handle.remove()
+            self._backward_handle = None
+        self.activations = None
+        self.gradients = None
+        if self.model is not None:
+            self.model.zero_grad(set_to_none=True)
 
     def generate_cam(
         self,
@@ -36,7 +50,7 @@ class GradCAMExplainer:
         use_gradcam_plus_plus: bool = True
     ) -> np.ndarray:
         self.model.eval()
-        self.model.zero_grad()
+        self.model.zero_grad(set_to_none=True)
         
         # Ensure tensor requires gradient
         input_tensor = input_tensor.clone().detach().requires_grad_(True)
@@ -46,14 +60,19 @@ class GradCAMExplainer:
             target_class_idx = int(torch.argmax(logits, dim=1).item())
 
         score = logits[0, target_class_idx]
-        score.backward(retain_graph=True)
+        score.backward(retain_graph=False)
 
         if self.activations is None or self.gradients is None:
-            # Fallback synthetic activation map if hooks fail
+            self.cleanup()
             return np.ones((224, 224), dtype=np.float32) * 0.5
 
         gradients = self.gradients[0].cpu().numpy()     # Shape: (C, H, W)
         activations = self.activations[0].cpu().numpy() # Shape: (C, H, W)
+        
+        # Immediately release PyTorch graph references
+        self.activations = None
+        self.gradients = None
+        self.model.zero_grad(set_to_none=True)
 
         if use_gradcam_plus_plus:
             # Grad-CAM++ weighting
@@ -63,6 +82,7 @@ class GradCAMExplainer:
             alpha_denom = 2 * grad_2 + spatial_sum * grad_3 + 1e-7
             alpha = grad_2 / alpha_denom
             weights = np.sum(alpha * np.maximum(gradients, 0), axis=(1, 2))
+            del grad_2, grad_3, spatial_sum, alpha_denom, alpha
         else:
             # Standard Grad-CAM global average pooling
             weights = np.mean(gradients, axis=(1, 2))
@@ -80,6 +100,8 @@ class GradCAMExplainer:
         else:
             cam = np.zeros_like(cam)
 
+        del gradients, activations, weights
+        self.cleanup()
         return cam
 
     @staticmethod

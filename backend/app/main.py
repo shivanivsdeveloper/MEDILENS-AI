@@ -7,6 +7,17 @@ project_root = Path(__file__).resolve().parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
+# Configure lightweight PyTorch CPU execution for 512 MB memory constraint
+try:
+    import torch
+    torch.set_num_threads(1)
+    try:
+        torch.set_num_interop_threads(1)
+    except Exception:
+        pass
+except Exception:
+    pass
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -99,18 +110,15 @@ def root():
 
 @app.get("/health", tags=["System Health"])
 def health_check():
-    import platform, shutil, torch
-    has_cuda = torch.cuda.is_available()
-    device_name = torch.cuda.get_device_name(0) if has_cuda else "CPU (Direct Acceleration)"
+    import platform
     return {
         "status": "Healthy",
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
         "platform": f"{platform.system()} {platform.release()} ({platform.machine()})",
-        "compute_device": device_name,
-        "cuda_available": has_cuda,
+        "compute_device": "CPU (Low-Memory Engine)",
         "database_status": "Connected",
-        "inference_engine": "Online"
+        "inference_engine": "Online (Lazy Loading)"
     }
 
 if __name__ == "__main__":

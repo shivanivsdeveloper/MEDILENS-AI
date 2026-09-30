@@ -28,8 +28,6 @@ class ChestXRayModule(MedicalModule):
         self._labels = ["Normal", "Pneumonia", "Infiltration", "Effusion", "Atelectasis", "Nodule"]
         self._is_installed = True
         self.model = None
-        self.explainer = None
-        self.load_model()
 
     @property
     def module_id(self) -> str:
@@ -59,17 +57,30 @@ class ChestXRayModule(MedicalModule):
     def is_installed(self) -> bool:
         return self._is_installed
 
+    def ensure_loaded(self) -> None:
+        if self.model is None:
+            self.load_model()
+
+    def unload_model(self) -> None:
+        if self.model is not None:
+            del self.model
+            self.model = None
+        import gc
+        gc.collect()
+
     def load_model(self) -> None:
+        if self.model is not None:
+            return
         try:
-            # Initialize ResNet50 backbone
-            net = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+            import gc
+            # Initialize ResNet50 backbone without heavy default weights
+            net = models.resnet50(weights=None)
             num_features = net.fc.in_features
             net.fc = nn.Linear(num_features, len(self._labels))
 
             # Look for trained checkpoint weights
             ckpt_path = settings.CHECKPOINTS_DIR / "mediscan_chest_x-ray_resnet50_clinical.pt"
             if not ckpt_path.exists():
-                # Fallback check any custom trained chest xray checkpoints
                 candidates = list(settings.CHECKPOINTS_DIR.glob("*chest*.pt"))
                 if candidates:
                     ckpt_path = candidates[0]
@@ -78,25 +89,29 @@ class ChestXRayModule(MedicalModule):
                 try:
                     checkpoint = torch.load(str(ckpt_path), map_location=torch.device('cpu'))
                     if 'model_state_dict' in checkpoint:
-                        # Load matching layers
                         model_dict = net.state_dict()
                         pretrained_dict = {k: v for k, v in checkpoint['model_state_dict'].items() if k in model_dict and model_dict[k].shape == v.shape}
                         model_dict.update(pretrained_dict)
                         net.load_state_dict(model_dict)
                         print(f"[ChestXRayModule] Loaded real trained weights from {ckpt_path.name}")
+                    del checkpoint
+                    gc.collect()
                 except Exception as ex:
                     print(f"[Warning] Could not load checkpoint {ckpt_path.name}: {ex}")
 
             net.eval()
             self.model = net
-            # Hook last convolutional layer (layer4) for Grad-CAM
-            self.explainer = GradCAMExplainer(self.model, self.model.layer4[-1])
         except Exception as e:
             print(f"[Warning] Failed to load ChestXRay PyTorch model: {e}")
             self._is_installed = False
 
     def predict(self, image_path: str, quality_score: float = 85.0) -> Dict[str, Any]:
+        self.ensure_loaded()
+        if self.model is None:
+            raise RuntimeError("Chest X-ray AI model could not be loaded due to available server memory limits.")
+
         start_time = time.time()
+        import gc
         
         # 1. Preprocess image
         tensor, preprocessed_canvas, preproc_meta = PreprocessingPipeline.preprocess_image(
@@ -133,8 +148,11 @@ class ChestXRayModule(MedicalModule):
             is_ood=is_ood
         )
 
-        # 7. Explainability: Grad-CAM & 2.5D Elevation Grid
-        cam_map = self.explainer.generate_cam(tensor, target_class_idx=top_idx, use_gradcam_plus_plus=True)
+        # 7. Explainability: Grad-CAM (on-demand hook & release)
+        explainer = GradCAMExplainer(self.model, self.model.layer4[-1])
+        cam_map = explainer.generate_cam(tensor, target_class_idx=top_idx, use_gradcam_plus_plus=True)
+        explainer.cleanup()
+        del explainer
         
         uid = uuid.uuid4().hex[:10]
         heatmap_filename = f"cam_{uid}.png"
@@ -157,6 +175,9 @@ class ChestXRayModule(MedicalModule):
             output_mask_path=mask_output_path,
             threshold_ratio=0.45
         )
+
+        del tensor, logits, probs_tensor, cam_map
+        gc.collect()
 
         inference_time_ms = round((time.time() - start_time) * 1000.0, 2)
 

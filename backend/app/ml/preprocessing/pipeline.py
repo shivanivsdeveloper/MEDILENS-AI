@@ -18,13 +18,22 @@ class PreprocessingPipeline:
         apply_clahe: bool = True,
         is_grayscale: bool = False
     ) -> Tuple[torch.Tensor, np.ndarray, Dict[str, Any]]:
-        # 1. Load image
-        img = cv2.imread(image_path)
-        if img is None:
-            pil_img = Image.open(image_path).convert("RGB")
-            img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        import gc
+        # 1. Load image (with PIL max size downscale to protect container memory)
+        try:
+            with Image.open(image_path) as pil_img:
+                original_w, original_h = pil_img.size
+                # If image exceeds 1024x1024, downsample initially to prevent huge RAM spikes
+                if original_w > 1024 or original_h > 1024:
+                    pil_img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
+                img = cv2.cvtColor(np.array(pil_img.convert("RGB")), cv2.COLOR_RGB2BGR)
+        except Exception:
+            img = cv2.imread(image_path)
+            if img is None:
+                img = np.zeros((224, 224, 3), dtype=np.uint8)
+            original_h, original_w = img.shape[:2]
 
-        original_h, original_w = img.shape[:2]
+        cur_h, cur_w = img.shape[:2]
 
         # 2. Color space handling & CLAHE
         if is_grayscale or len(img.shape) == 2 or img.shape[2] == 1:
@@ -36,8 +45,8 @@ class PreprocessingPipeline:
                 clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
                 gray = clahe.apply(gray)
             rgb_processed = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
+            del gray
         else:
-            # Color image (e.g., Retinal or Skin Lesion)
             if apply_clahe:
                 lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
                 l, a, b = cv2.split(lab)
@@ -45,22 +54,27 @@ class PreprocessingPipeline:
                 cl = clahe.apply(l)
                 limg = cv2.merge((cl, a, b))
                 rgb_processed = cv2.cvtColor(limg, cv2.COLOR_LAB2RGB)
+                del lab, l, a, b, cl, limg
             else:
                 rgb_processed = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+        del img
+
         # 3. Aspect-ratio preserving resize with letterbox padding
         target_w, target_h = target_size
-        scale = min(target_w / original_w, target_h / original_h)
-        new_w = int(original_w * scale)
-        new_h = int(original_h * scale)
+        scale = min(target_w / cur_w, target_h / cur_h)
+        new_w = max(1, int(cur_w * scale))
+        new_h = max(1, int(cur_h * scale))
         
         resized = cv2.resize(rgb_processed, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        del rgb_processed
         
         # Canvas creation
         canvas = np.zeros((target_h, target_w, 3), dtype=np.uint8)
         pad_x = (target_w - new_w) // 2
         pad_y = (target_h - new_h) // 2
         canvas[pad_y:pad_y + new_h, pad_x:pad_x + new_w] = resized
+        del resized
 
         # 4. PyTorch Tensor Transformation (ImageNet normalization)
         transform = transforms.Compose([
@@ -82,4 +96,5 @@ class PreprocessingPipeline:
             "normalized": True
         }
 
+        gc.collect()
         return tensor, canvas, metadata

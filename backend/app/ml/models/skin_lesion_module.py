@@ -26,8 +26,6 @@ class SkinLesionModule(MedicalModule):
         self._labels = ["Benign Nevus", "Melanoma", "Basal Cell Carcinoma"]
         self._is_installed = True
         self.model = None
-        self.explainer = None
-        self.load_model()
 
     @property
     def module_id(self) -> str:
@@ -57,20 +55,39 @@ class SkinLesionModule(MedicalModule):
     def is_installed(self) -> bool:
         return self._is_installed
 
+    def ensure_loaded(self) -> None:
+        if self.model is None:
+            self.load_model()
+
+    def unload_model(self) -> None:
+        if self.model is not None:
+            del self.model
+            self.model = None
+        import gc
+        gc.collect()
+
     def load_model(self) -> None:
+        if self.model is not None:
+            return
         try:
-            net = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+            import gc
+            net = models.resnet50(weights=None)
             num_features = net.fc.in_features
             net.fc = nn.Linear(num_features, len(self._labels))
             net.eval()
             self.model = net
-            self.explainer = GradCAMExplainer(self.model, self.model.layer4[-1])
+            gc.collect()
         except Exception as e:
             print(f"[Warning] Skin module init: {e}")
             self._is_installed = False
 
     def predict(self, image_path: str, quality_score: float = 85.0) -> Dict[str, Any]:
+        self.ensure_loaded()
+        if self.model is None:
+            raise RuntimeError("Skin Lesion AI model could not be loaded due to available server memory limits.")
+
         start_time = time.time()
+        import gc
         tensor, _, _ = PreprocessingPipeline.preprocess_image(
             image_path=image_path,
             target_size=(224, 224),
@@ -99,7 +116,11 @@ class SkinLesionModule(MedicalModule):
             is_ood=is_ood
         )
 
-        cam_map = self.explainer.generate_cam(tensor, target_class_idx=top_idx, use_gradcam_plus_plus=True)
+        explainer = GradCAMExplainer(self.model, self.model.layer4[-1])
+        cam_map = explainer.generate_cam(tensor, target_class_idx=top_idx, use_gradcam_plus_plus=True)
+        explainer.cleanup()
+        del explainer
+
         uid = uuid.uuid4().hex[:10]
         heatmap_filename = f"cam_{uid}.png"
         heatmap_path = str(settings.OUTPUTS_DIR / heatmap_filename)
@@ -108,6 +129,9 @@ class SkinLesionModule(MedicalModule):
         mask_filename = f"roi_{uid}.png"
         mask_path = str(settings.OUTPUTS_DIR / mask_filename)
         _, measurements = ClinicalSegmentor.segment_roi(image_path, cam_map, mask_path, 0.45)
+
+        del tensor, logits, probs_tensor, cam_map
+        gc.collect()
 
         inference_time_ms = round((time.time() - start_time) * 1000.0, 2)
 

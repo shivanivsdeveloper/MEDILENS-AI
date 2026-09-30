@@ -8,17 +8,18 @@ from backend.app.ml.models.brain_mri_module import BrainMRIModule
 
 class ModelRegistry:
     """
-    Central Registry for all diagnostic models, managing instantiation,
-    routing, benchmarking, and lifecycle operations.
+    Central Registry for all diagnostic models, managing lazy instantiation,
+    routing, benchmarking, and single-active-model memory management.
     """
 
     def __init__(self):
         self._modules: Dict[str, MedicalModule] = {}
         self._modality_map: Dict[str, str] = {}
+        self._active_module_id: Optional[str] = None
         self._initialize_modules()
 
     def _initialize_modules(self):
-        # Register core modules
+        # Register core modules as lightweight metadata wrappers (weights are loaded lazily)
         chest = ChestXRayModule()
         self._modules[chest.module_id] = chest
         self._modality_map["Chest X-ray"] = chest.module_id
@@ -39,15 +40,30 @@ class ModelRegistry:
         self._modules[brain.module_id] = brain
         self._modality_map["Brain MRI"] = brain.module_id
 
+    def _manage_memory_for_module(self, target_module_id: str) -> None:
+        import gc
+        if self._active_module_id and self._active_module_id != target_module_id:
+            active_mod = self._modules.get(self._active_module_id)
+            if active_mod:
+                try:
+                    active_mod.unload_model()
+                except Exception:
+                    pass
+            gc.collect()
+        self._active_module_id = target_module_id
+
     def get_module_for_modality(self, modality: str) -> Optional[MedicalModule]:
-        module_id = self._modality_map.get(modality)
-        if module_id and module_id in self._modules:
-            return self._modules[module_id]
-        # Fallback to Chest X-ray if modality is unknown or general radiographic
-        return self._modules.get("mod_chest_xray_v2")
+        module_id = self._modality_map.get(modality, "mod_chest_xray_v2")
+        mod = self._modules.get(module_id) or self._modules.get("mod_chest_xray_v2")
+        if mod:
+            self._manage_memory_for_module(mod.module_id)
+        return mod
 
     def get_module_by_id(self, module_id: str) -> Optional[MedicalModule]:
-        return self._modules.get(module_id)
+        mod = self._modules.get(module_id)
+        if mod:
+            self._manage_memory_for_module(mod.module_id)
+        return mod
 
     def list_modules(self) -> List[Dict[str, Any]]:
         result = []

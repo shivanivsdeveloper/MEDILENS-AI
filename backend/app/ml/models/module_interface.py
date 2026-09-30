@@ -47,6 +47,14 @@ class MedicalModule(ABC):
     def load_model(self) -> None:
         pass
 
+    def ensure_loaded(self) -> None:
+        """Ensures weights are loaded into memory lazily before inference."""
+        pass
+
+    def unload_model(self) -> None:
+        """Unloads weights and calls garbage collection to free container RAM."""
+        pass
+
     @abstractmethod
     def predict(
         self,
