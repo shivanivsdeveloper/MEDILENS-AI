@@ -65,6 +65,28 @@ class ChestXRayModule(MedicalModule):
             net = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
             num_features = net.fc.in_features
             net.fc = nn.Linear(num_features, len(self._labels))
+
+            # Look for trained checkpoint weights
+            ckpt_path = settings.CHECKPOINTS_DIR / "mediscan_chest_x-ray_resnet50_clinical.pt"
+            if not ckpt_path.exists():
+                # Fallback check any custom trained chest xray checkpoints
+                candidates = list(settings.CHECKPOINTS_DIR.glob("*chest*.pt"))
+                if candidates:
+                    ckpt_path = candidates[0]
+
+            if ckpt_path.exists():
+                try:
+                    checkpoint = torch.load(str(ckpt_path), map_location=torch.device('cpu'))
+                    if 'model_state_dict' in checkpoint:
+                        # Load matching layers
+                        model_dict = net.state_dict()
+                        pretrained_dict = {k: v for k, v in checkpoint['model_state_dict'].items() if k in model_dict and model_dict[k].shape == v.shape}
+                        model_dict.update(pretrained_dict)
+                        net.load_state_dict(model_dict)
+                        print(f"[ChestXRayModule] Loaded real trained weights from {ckpt_path.name}")
+                except Exception as ex:
+                    print(f"[Warning] Could not load checkpoint {ckpt_path.name}: {ex}")
+
             net.eval()
             self.model = net
             # Hook last convolutional layer (layer4) for Grad-CAM
