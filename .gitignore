@@ -18,6 +18,8 @@ node_modules/
 frontend/node_modules/
 dist/
 frontend/dist/
+.env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
@@ -34,6 +36,10 @@ outputs/*.png
 outputs/*.jpg
 outputs/*.pdf
 reports/*.pdf
+data/raw/*
+data/processed/*
+!data/sample/*
+!data/training_datasets/*
 
 # IDE & OS
 .DS_Store

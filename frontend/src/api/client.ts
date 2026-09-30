@@ -3,7 +3,18 @@ import {
   ExperimentItem, DashboardAnalytics, SystemHealthData, AuditLogItem
 } from '../types';
 
-const API_BASE = '/api';
+const RAW_API_URL: string = import.meta.env.VITE_API_URL || '';
+export const BACKEND_URL = RAW_API_URL.replace(/\/$/, '');
+export const API_BASE = BACKEND_URL ? `${BACKEND_URL}/api` : '/api';
+
+export function getStaticUrl(path?: string | null): string {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:') || path.startsWith('blob:')) {
+    return path;
+  }
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return BACKEND_URL ? `${BACKEND_URL}${cleanPath}` : cleanPath;
+}
 
 export const api = {
   // System Health

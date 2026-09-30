@@ -5,7 +5,7 @@ import {
   ShieldCheck, AlertTriangle, Layers, RefreshCw, UserCheck, Sparkles, Image as ImageIcon
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Area, ComposedChart } from 'recharts';
-import { api } from '../api/client';
+import { api, getStaticUrl } from '../api/client';
 import { PatientItem, PatientDigitalTwinData, ProgressionSimulationResult } from '../types';
 import { Language } from '../i18n/translations';
 
@@ -180,7 +180,7 @@ export const DigitalTwinPage: React.FC<DigitalTwinPageProps> = () => {
                   <div className="bg-matrix-black rounded-lg aspect-square flex items-center justify-center border border-surface-border relative overflow-hidden">
                     {item.heatmap_filename ? (
                       <img
-                        src={`/static/outputs/${item.heatmap_filename}`}
+                        src={getStaticUrl(`/static/outputs/${item.heatmap_filename}`)}
                         alt="Scan Heatmap"
                         className="w-full h-full object-cover"
                       />
@@ -235,7 +235,7 @@ export const DigitalTwinPage: React.FC<DigitalTwinPageProps> = () => {
                       <div className="bg-matrix-black rounded-lg aspect-video flex items-center justify-center border border-surface-border overflow-hidden relative">
                         {comp.difference_map_filename ? (
                           <img
-                            src={`/static/outputs/${comp.difference_map_filename}`}
+                            src={getStaticUrl(`/static/outputs/${comp.difference_map_filename}`)}
                             alt="Visual Delta Heatmap"
                             className="w-full h-full object-cover"
                           />

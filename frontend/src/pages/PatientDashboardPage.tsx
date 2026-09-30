@@ -5,6 +5,7 @@ import {
   Heart, Sparkles, ArrowRight, Copy, Check, ShieldAlert
 } from 'lucide-react';
 import { Language, translations } from '../i18n/translations';
+import { getStaticUrl } from '../api/client';
 
 interface PatientDashboardProps {
   language: Language;
@@ -159,7 +160,7 @@ export const PatientDashboardPage: React.FC<PatientDashboardProps> = ({ language
                 </span>
                 <div className="w-full aspect-square rounded-lg bg-slate-950 overflow-hidden flex items-center justify-center relative">
                   <img
-                    src={`/static/raw/scan_${selectedScan?.id || 1}.png`}
+                    src={getStaticUrl(selectedScan?.file_url || `/static/raw/scan_${selectedScan?.id || 1}.png`)}
                     onError={(e: any) => {
                       e.target.src = "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=500&auto=format&fit=crop&q=60";
                     }}
@@ -175,7 +176,7 @@ export const PatientDashboardPage: React.FC<PatientDashboardProps> = ({ language
                 </span>
                 <div className="w-full aspect-square rounded-lg bg-slate-950 overflow-hidden flex items-center justify-center relative">
                   <img
-                    src={`/static/raw/scan_${selectedScan?.id || 1}.png`}
+                    src={getStaticUrl(selectedScan?.file_url || `/static/raw/scan_${selectedScan?.id || 1}.png`)}
                     onError={(e: any) => {
                       e.target.src = "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=500&auto=format&fit=crop&q=60";
                     }}

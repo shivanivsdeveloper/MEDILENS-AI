@@ -5,7 +5,7 @@ import {
   Send, ShieldAlert, CheckCircle2, AlertTriangle, Crosshair,
   Maximize2, ZoomIn, ZoomOut, Contrast, Layers, ArrowLeft
 } from 'lucide-react';
-import { api } from '../api/client';
+import { api, getStaticUrl } from '../api/client';
 import { ScanItem, AnalysisData, ModelEntry } from '../types';
 import { TopographicalGradCam3D } from '../components/spatial/TopographicalGradCam3D';
 import { ConfidenceCard } from '../components/analysis/ConfidenceCard';
@@ -315,11 +315,11 @@ export const AIAnalysisPage: React.FC<{ language: Language; userRole: string }> 
                 >
                   {/* Base Radiograph */}
                   <img
-                    src={
+                    src={getStaticUrl(
                       viewMode === 'SEGMENTATION' && analysis?.segmentation_mask_url
                         ? analysis.segmentation_mask_url
                         : scan.file_url
-                    }
+                    )}
                     alt="Radiograph"
                     className="max-h-full max-w-full object-contain"
                   />
@@ -327,7 +327,7 @@ export const AIAnalysisPage: React.FC<{ language: Language; userRole: string }> 
                   {/* Grad-CAM++ Overlay Layer */}
                   {viewMode === '2D_OVERLAY' && analysis?.heatmap_url && (
                     <img
-                      src={analysis.heatmap_url}
+                      src={getStaticUrl(analysis.heatmap_url)}
                       alt="Grad-CAM Overlay"
                       style={{ opacity: heatmapOpacity }}
                       className="absolute max-h-full max-w-full object-contain pointer-events-none mix-blend-screen"

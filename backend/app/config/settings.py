@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "MediScan AI"
     VERSION: str = "2.5.0"
     API_V1_PREFIX: str = "/api"
-    DEBUG: bool = True
-    ENVIRONMENT: str = "development"
+    DEBUG: bool = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
     
     # Paths
     BASE_DIR: Path = BASE_DIR
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     OUTPUTS_DIR: Path = OUTPUTS_DIR
     
     # Database
-    DATABASE_URL: str = f"sqlite:///{BASE_DIR}/mediscan.db"
+    DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/mediscan.db")
     
     # Upload limits
     MAX_UPLOAD_SIZE_MB: int = 50
@@ -46,6 +46,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://*.vercel.app",
         "*"
     ]
     

@@ -4,6 +4,7 @@ import {
   CheckCircle2, Activity, ZoomIn, Target, RefreshCw
 } from 'lucide-react';
 import { Language, translations } from '../i18n/translations';
+import { getStaticUrl } from '../api/client';
 
 interface SegmentationLabProps {
   language: Language;
@@ -121,7 +122,7 @@ export const SegmentationLabPage: React.FC<SegmentationLabProps> = ({ language }
                 <span className="text-[11px] font-mono text-slate-400 mb-2">Original Scan</span>
                 <div className="w-full aspect-square rounded-lg bg-slate-900 flex items-center justify-center overflow-hidden border border-slate-800 relative">
                   <img
-                    src={`/static/raw/scan_${selectedScanId}.png`}
+                    src={getStaticUrl(`/static/raw/scan_${selectedScanId}.png`)}
                     onError={(e: any) => {
                       e.target.src = "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=500&auto=format&fit=crop&q=60";
                     }}
@@ -136,7 +137,7 @@ export const SegmentationLabPage: React.FC<SegmentationLabProps> = ({ language }
                 <span className="text-[11px] font-mono text-pink-400 mb-2 font-bold">Predicted Lesion Mask Overlay</span>
                 <div className="w-full aspect-square rounded-lg bg-slate-900 flex items-center justify-center overflow-hidden border border-pink-500/20 relative">
                   <img
-                    src={`/static/raw/scan_${selectedScanId}.png`}
+                    src={getStaticUrl(`/static/raw/scan_${selectedScanId}.png`)}
                     onError={(e: any) => {
                       e.target.src = "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=500&auto=format&fit=crop&q=60";
                     }}

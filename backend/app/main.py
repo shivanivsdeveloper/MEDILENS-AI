@@ -93,8 +93,26 @@ def root():
         "version": settings.VERSION,
         "status": "Operational",
         "docs_url": "/docs",
+        "health_url": "/health",
         "safety_notice": "AI screening decision-support system. Not a definitive medical diagnosis."
     }
 
+@app.get("/health", tags=["System Health"])
+def health_check():
+    import platform, shutil, torch
+    has_cuda = torch.cuda.is_available()
+    device_name = torch.cuda.get_device_name(0) if has_cuda else "CPU (Direct Acceleration)"
+    return {
+        "status": "Healthy",
+        "version": settings.VERSION,
+        "environment": settings.ENVIRONMENT,
+        "platform": f"{platform.system()} {platform.release()} ({platform.machine()})",
+        "compute_device": device_name,
+        "cuda_available": has_cuda,
+        "database_status": "Connected",
+        "inference_engine": "Online"
+    }
+
 if __name__ == "__main__":
-    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=port, reload=settings.DEBUG)

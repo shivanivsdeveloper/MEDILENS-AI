@@ -5,6 +5,7 @@ import {
   ArrowRight, RefreshCw, ZoomIn, Layers, MessageSquare, Sliders
 } from 'lucide-react';
 import { Language, translations } from '../i18n/translations';
+import { getStaticUrl } from '../api/client';
 
 interface DoctorDashboardProps {
   language: Language;
@@ -283,7 +284,7 @@ export const DoctorDashboardPage: React.FC<DoctorDashboardProps> = ({ language }
                 <span className="text-xs font-mono text-slate-400 mb-2">Patient Radiograph (Raw)</span>
                 <div className="w-full aspect-square rounded-lg bg-slate-900 overflow-hidden flex items-center justify-center relative">
                   <img
-                    src={`/static/raw/scan_${selectedScan?.id || 1}.png`}
+                    src={getStaticUrl(selectedScan?.file_url || `/static/raw/scan_${selectedScan?.id || 1}.png`)}
                     onError={(e: any) => {
                       e.target.src = "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=500&auto=format&fit=crop&q=60";
                     }}
@@ -302,7 +303,7 @@ export const DoctorDashboardPage: React.FC<DoctorDashboardProps> = ({ language }
 
                 <div className="w-full aspect-square rounded-lg bg-slate-900 overflow-hidden flex items-center justify-center relative">
                   <img
-                    src={`/static/raw/scan_${selectedScan?.id || 1}.png`}
+                    src={getStaticUrl(selectedScan?.file_url || `/static/raw/scan_${selectedScan?.id || 1}.png`)}
                     onError={(e: any) => {
                       e.target.src = "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=500&auto=format&fit=crop&q=60";
                     }}

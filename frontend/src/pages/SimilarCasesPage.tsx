@@ -4,6 +4,7 @@ import {
   Info, Filter, ArrowRight, UserCheck, ShieldAlert
 } from 'lucide-react';
 import { Language, translations } from '../i18n/translations';
+import { api, getStaticUrl } from '../api/client';
 
 interface SimilarCasesProps {
   language: Language;
@@ -19,8 +20,7 @@ export const SimilarCasesPage: React.FC<SimilarCasesProps> = ({ language }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/v1/scans?limit=10')
-      .then(res => res.json())
+    api.listScans()
       .then(data => {
         if (data && data.length > 0) {
           setScans(data);
@@ -42,8 +42,7 @@ export const SimilarCasesPage: React.FC<SimilarCasesProps> = ({ language }) => {
     if (!selectedScanId) return;
     setLoading(true);
 
-    fetch(`/api/v1/research/similar-cases/${selectedScanId}?top_k=${topK}`)
-      .then(res => res.json())
+    api.getSimilarCases(selectedScanId, topK)
       .then(data => {
         setSimilarData(data);
         setLoading(false);
@@ -121,7 +120,7 @@ export const SimilarCasesPage: React.FC<SimilarCasesProps> = ({ language }) => {
 
             <div className="w-full aspect-square rounded-xl bg-matrix-black border border-coherent-blue/40 overflow-hidden flex items-center justify-center relative mb-4">
               <img
-                src={`/static/raw/scan_${selectedScanId}.png`}
+                src={getStaticUrl(`/static/raw/scan_${selectedScanId}.png`)}
                 onError={(e: any) => {
                   e.target.src = "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=500&auto=format&fit=crop&q=60";
                 }}
@@ -176,7 +175,7 @@ export const SimilarCasesPage: React.FC<SimilarCasesProps> = ({ language }) => {
                 {/* Image Preview */}
                 <div className="w-24 h-24 shrink-0 rounded-lg bg-matrix-black border border-surface-border overflow-hidden relative">
                   <img
-                    src={`/static/raw/scan_${c.scan_id}.png`}
+                    src={getStaticUrl(`/static/raw/scan_${c.scan_id}.png`)}
                     onError={(e: any) => {
                       e.target.src = "https://images.unsplash.com/photo-1516549655169-df83a0774514?w=500&auto=format&fit=crop&q=60";
                     }}

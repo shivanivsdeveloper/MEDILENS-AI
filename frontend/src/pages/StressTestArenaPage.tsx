@@ -4,7 +4,7 @@ import {
   Zap, Sliders, ShieldCheck, AlertTriangle, ShieldAlert,
   Play, RefreshCw, Layers, CheckCircle, XCircle, Gauge, Cpu
 } from 'lucide-react';
-import { api } from '../api/client';
+import { api, getStaticUrl } from '../api/client';
 import { ScanItem, StressTestResult } from '../types';
 import { Language } from '../i18n/translations';
 
@@ -301,7 +301,7 @@ export const StressTestArenaPage: React.FC<StressTestArenaPageProps> = () => {
 
                 <div className="bg-matrix-black rounded-lg aspect-square overflow-hidden border border-surface-border relative">
                   <img
-                    src={`/static/outputs/${p.perturbed_image_filename}`}
+                    src={getStaticUrl(`/static/outputs/${p.perturbed_image_filename}`)}
                     alt="Perturbed Scan"
                     className="w-full h-full object-cover"
                   />
