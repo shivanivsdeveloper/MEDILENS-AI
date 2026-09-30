@@ -12,6 +12,8 @@ from backend.app.ml.preprocessing.quality_engine import ImageQualityEngine
 from backend.app.ml.modality_detector import ModalityDetector
 from backend.app.ml.registry.model_registry import model_registry
 
+from backend.app.services.auth_service import AuthService
+
 class SeedService:
     @staticmethod
     def create_sample_images():
@@ -107,6 +109,7 @@ class SeedService:
     @staticmethod
     def seed_initial_data(db: Session):
         SeedService.create_sample_images()
+        AuthService.seed_users(db)
 
         # 1. Seed Model Registry Entries
         if db.query(ModelEntry).count() == 0:

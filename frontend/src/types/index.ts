@@ -84,6 +84,11 @@ export interface ScanItem {
   risk_indicator?: 'Low' | 'Moderate' | 'High' | 'Needs Review';
   review_status?: string;
   analysis?: AnalysisData;
+  workflow_stage?: string;
+  assigned_doctor_id?: number;
+  scan_center_id?: number;
+  is_released_to_patient?: boolean;
+  doctor_approved_report?: string;
 }
 
 export interface PatientItem {
@@ -208,7 +213,7 @@ export interface AuditLogItem {
   action: string;
   resource_type: string;
   resource_id?: string;
-  details: Record<string, any>;
+  details: string | Record<string, any>;
   ip_address: string;
 }
 

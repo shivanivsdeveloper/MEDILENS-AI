@@ -6,6 +6,117 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from backend.app.models.database import Base
 
+# ==========================================
+# AUTHENTICATION & ROLE-BASED ACCESS
+# ==========================================
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(64), unique=True, index=True, nullable=False)
+    email = Column(String(128), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(String(32), default="Patient", nullable=False)  # Patient, Doctor, ScanCenter, Admin, Researcher
+    
+    is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False)
+    verification_status = Column(String(32), default="Pending")  # Approved, Pending, Rejected
+    
+    failed_login_attempts = Column(Integer, default=0)
+    locked_until = Column(DateTime, nullable=True)
+    last_login = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    doctor_profile = relationship("DoctorProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    scan_center_profile = relationship("ScanCenterProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    patient_profile = relationship("PatientProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+
+class DoctorProfile(Base):
+    __tablename__ = "doctor_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    full_name = Column(String(128), nullable=False)
+    specialty = Column(String(128), default="General Radiologist")
+    registration_number = Column(String(64), nullable=False)  # Medical Council Registration
+    hospital_clinic = Column(String(255), nullable=False)
+    phone = Column(String(32), nullable=True)
+    bio = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="doctor_profile")
+    assigned_scans = relationship("Scan", back_populates="assigned_doctor", foreign_keys="Scan.assigned_doctor_id")
+
+class ScanCenterProfile(Base):
+    __tablename__ = "scan_center_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    center_name = Column(String(255), nullable=False)
+    license_number = Column(String(64), nullable=False)  # Diagnostic Facility License
+    address = Column(Text, nullable=False)
+    contact_phone = Column(String(32), nullable=False)
+    contact_email = Column(String(128), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="scan_center_profile")
+    uploaded_scans = relationship("Scan", back_populates="scan_center", foreign_keys="Scan.scan_center_id")
+
+class PatientProfile(Base):
+    __tablename__ = "patient_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    patient_record_id = Column(Integer, ForeignKey("patients.id"), nullable=True)  # Link to core clinical patient record
+    full_name = Column(String(128), nullable=False)
+    age = Column(Integer, nullable=True)
+    gender = Column(String(16), nullable=True)
+    phone = Column(String(32), nullable=True)
+    preferred_language = Column(String(8), default="en")  # en, ta, hi
+    consent_given_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="patient_profile")
+    patient_record = relationship("Patient", back_populates="patient_user_profile")
+
+class ScanShareLink(Base):
+    __tablename__ = "scan_share_links"
+
+    id = Column(Integer, primary_key=True, index=True)
+    scan_id = Column(Integer, ForeignKey("scans.id"), nullable=False, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False, index=True)
+    share_token = Column(String(128), unique=True, index=True, nullable=False)
+    recipient_email_or_name = Column(String(128), nullable=True)
+    expires_at = Column(DateTime, nullable=False)
+    is_revoked = Column(Boolean, default=False)
+    access_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class DoctorImpression(Base):
+    __tablename__ = "doctor_impressions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    scan_id = Column(Integer, ForeignKey("scans.id"), nullable=False, index=True)
+    doctor_id = Column(Integer, ForeignKey("doctor_profiles.id"), nullable=False, index=True)
+    
+    initial_impression = Column(String(128), nullable=True)  # Blinded impression prior to AI reveal
+    initial_confidence = Column(Float, nullable=True)
+    ai_revealed_at = Column(DateTime, nullable=True)
+    
+    final_decision = Column(String(32), nullable=False, default="Pending")  # Accepted, Modified, Escalated, Rejected
+    agreement_level = Column(String(32), nullable=True)  # Complete Agreement, Partial Agreement, Disagreement
+    
+    clinical_notes = Column(Text, nullable=True)
+    voice_transcript = Column(Text, nullable=True)
+    signed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ==========================================
+# CORE CLINICAL WORKSTATION ENTITIES
+# ==========================================
+
 class Patient(Base):
     __tablename__ = "patients"
 
@@ -19,12 +130,16 @@ class Patient(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     scans = relationship("Scan", back_populates="patient", cascade="all, delete-orphan")
+    patient_user_profile = relationship("PatientProfile", back_populates="patient_record", uselist=False)
 
 class Scan(Base):
     __tablename__ = "scans"
 
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("patients.id"), nullable=True, index=True)
+    scan_center_id = Column(Integer, ForeignKey("scan_center_profiles.id"), nullable=True, index=True)
+    assigned_doctor_id = Column(Integer, ForeignKey("doctor_profiles.id"), nullable=True, index=True)
+
     scan_uid = Column(String(64), unique=True, index=True, nullable=False)
     file_name = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
@@ -40,10 +155,17 @@ class Scan(Base):
     quality_metrics = Column(Text, default="{}")  # JSON string
     
     status = Column(String(32), default="Uploaded")  # Uploaded, Analyzing, Completed, Failed
+    workflow_stage = Column(String(32), default="Uploaded")  # Uploaded, QualityChecked, DoctorReviewing, ReportReady, Delivered
+    is_released_to_patient = Column(Boolean, default=False)
+    doctor_approved_report = Column(Text, nullable=True)
+
     is_synthetic_demo = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     patient = relationship("Patient", back_populates="scans")
+    scan_center = relationship("ScanCenterProfile", back_populates="uploaded_scans", foreign_keys=[scan_center_id])
+    assigned_doctor = relationship("DoctorProfile", back_populates="assigned_scans", foreign_keys=[assigned_doctor_id])
+
     analysis = relationship("AnalysisResult", back_populates="scan", uselist=False, cascade="all, delete-orphan")
     reviews = relationship("ReviewRecord", back_populates="scan", cascade="all, delete-orphan")
 
@@ -177,8 +299,8 @@ class AuditLog(Base):
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     user_identifier = Column(String(128), default="system")
     role = Column(String(64), default="clinical_user")
-    action = Column(String(64), nullable=False)
-    resource_type = Column(String(64), nullable=False)
+    action = Column(String(64), nullable=False)  # VIEW, UPLOAD, REVIEW, APPROVE, REJECT, SHARE, EXPORT
+    resource_type = Column(String(64), nullable=False)  # SCAN, REPORT, PATIENT, MODEL, USER
     resource_id = Column(String(128), nullable=True)
     details = Column(Text, default="{}")  # JSON string
     ip_address = Column(String(64), default="127.0.0.1")
@@ -264,7 +386,7 @@ class StressTestRun(Base):
     id = Column(Integer, primary_key=True, index=True)
     model_id = Column(String(64), nullable=False, index=True)
     scan_id = Column(Integer, ForeignKey("scans.id"), nullable=False, index=True)
-    perturbation_type = Column(String(64), nullable=False)  # gaussian_noise, blur, contrast, brightness, rotation, compression, resolution
+    perturbation_type = Column(String(64), nullable=False)
     severity_level = Column(Float, default=0.5)
     original_prediction = Column(String(128), nullable=False)
     original_confidence = Column(Float, nullable=False)
@@ -284,5 +406,5 @@ class DriftRecord(Base):
     feature_drift_score = Column(Float, default=0.0)
     prediction_drift_score = Column(Float, default=0.0)
     ks_test_p_value = Column(Float, default=1.0)
-    status = Column(String(32), default="Stable")  # Stable, Minor Drift, Critical Drift
+    status = Column(String(32), default="Stable")
     details = Column(Text, default="{}")

@@ -285,5 +285,209 @@ export const api = {
     const res = await fetch(`${API_BASE}/drift/status`);
     if (!res.ok) throw new Error('Failed to fetch drift status');
     return res.json();
+  },
+
+  // ==========================================
+  // ROLE-BASED AUTH & WORKFLOW API
+  // ==========================================
+  auth: {
+    getToken(): string | null {
+      return localStorage.getItem('mediscan_token');
+    },
+    setToken(token: string) {
+      localStorage.setItem('mediscan_token', token);
+    },
+    clearToken() {
+      localStorage.removeItem('mediscan_token');
+      localStorage.removeItem('mediscan_user');
+    },
+    getCurrentUser(): any {
+      const u = localStorage.getItem('mediscan_user');
+      return u ? JSON.parse(u) : null;
+    },
+    setCurrentUser(user: any) {
+      localStorage.setItem('mediscan_user', JSON.stringify(user));
+    },
+
+    async login(username: string, password: string): Promise<any> {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Authentication failed' }));
+        throw new Error(err.detail || 'Authentication failed');
+      }
+      const data = await res.json();
+      if (data.access_token) {
+        localStorage.setItem('mediscan_token', data.access_token);
+        localStorage.setItem('mediscan_user', JSON.stringify(data.user));
+      }
+      return data;
+    },
+
+    async getMe(): Promise<any> {
+      const token = localStorage.getItem('mediscan_token');
+      const res = await fetch(`${API_BASE}/auth/me`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error('Failed to get current user clearance');
+      return res.json();
+    },
+
+    async signupPatient(payload: any): Promise<any> {
+      const res = await fetch(`${API_BASE}/auth/signup/patient`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Registration failed' }));
+        throw new Error(err.detail || 'Patient registration failed');
+      }
+      return res.json();
+    },
+
+    async signupDoctor(payload: any): Promise<any> {
+      const res = await fetch(`${API_BASE}/auth/signup/doctor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Registration failed' }));
+        throw new Error(err.detail || 'Doctor registration failed');
+      }
+      return res.json();
+    },
+
+    async signupScanCenter(payload: any): Promise<any> {
+      const res = await fetch(`${API_BASE}/auth/signup/scan-center`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Registration failed' }));
+        throw new Error(err.detail || 'Scan Center registration failed');
+      }
+      return res.json();
+    },
+
+    async getPendingApprovals(): Promise<any[]> {
+      const token = localStorage.getItem('mediscan_token');
+      const res = await fetch(`${API_BASE}/auth/admin/pending-approvals`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error('Failed to fetch pending approvals');
+      return res.json();
+    },
+
+    async decideApproval(userId: number, decision: 'Approved' | 'Rejected'): Promise<any> {
+      const token = localStorage.getItem('mediscan_token');
+      const res = await fetch(`${API_BASE}/auth/admin/approvals/${userId}/decision`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ decision })
+      });
+      if (!res.ok) throw new Error('Failed to record approval decision');
+      return res.json();
+    },
+
+    async getPatientScans(): Promise<any[]> {
+      const token = localStorage.getItem('mediscan_token');
+      const res = await fetch(`${API_BASE}/auth/patient/my-scans`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error('Failed to fetch patient scans');
+      return res.json();
+    },
+
+    async createShareLink(scanId: number, recipientName?: string, expiresDays: number = 7): Promise<any> {
+      const token = localStorage.getItem('mediscan_token');
+      const res = await fetch(`${API_BASE}/auth/patient/share-link`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ scan_id: scanId, recipient_name: recipientName, expires_days: expiresDays })
+      });
+      if (!res.ok) throw new Error('Failed to create share link');
+      return res.json();
+    },
+
+    async getDoctorWorklist(): Promise<any[]> {
+      const token = localStorage.getItem('mediscan_token');
+      const res = await fetch(`${API_BASE}/auth/doctor/worklist`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error('Failed to fetch doctor worklist');
+      return res.json();
+    },
+
+    async recordDoctorImpression(scanId: number, impression: string): Promise<any> {
+      const token = localStorage.getItem('mediscan_token');
+      const res = await fetch(`${API_BASE}/auth/doctor/impressions/${scanId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ impression })
+      });
+      if (!res.ok) throw new Error('Failed to record doctor impression');
+      return res.json();
+    },
+
+    async signAndReleaseReport(
+      scanId: number,
+      finalDecision: string = 'Accepted',
+      clinicalNotes: string = '',
+      releaseToPatient: boolean = true
+    ): Promise<any> {
+      const token = localStorage.getItem('mediscan_token');
+      const res = await fetch(`${API_BASE}/auth/doctor/sign-report/${scanId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          final_decision: finalDecision,
+          clinical_notes: clinicalNotes,
+          release_to_patient: releaseToPatient
+        })
+      });
+      if (!res.ok) throw new Error('Failed to sign and release report');
+      return res.json();
+    },
+
+    async getScanCenterWorkload(): Promise<any> {
+      const token = localStorage.getItem('mediscan_token');
+      const res = await fetch(`${API_BASE}/auth/scan-center/workload`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error('Failed to fetch scan center workload');
+      return res.json();
+    },
+
+    async assignScanToDoctor(scanId: number, doctorId: number): Promise<any> {
+      const token = localStorage.getItem('mediscan_token');
+      const res = await fetch(`${API_BASE}/auth/scan-center/assign-doctor`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ scan_id: scanId, doctor_id: doctorId })
+      });
+      if (!res.ok) throw new Error('Failed to assign scan to doctor');
+      return res.json();
+    }
   }
 };

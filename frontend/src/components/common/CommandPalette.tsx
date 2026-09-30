@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Orbit, Scale, Activity, Zap, PenTool, LayoutDashboard,
-  UploadCloud, Microscope, Users, Cpu, Database, X, ChevronRight, FileText
+  UploadCloud, Microscope, Users, Cpu, Database, X, ChevronRight, FileText,
+  Eye, ShieldAlert, Layers, Compass, GitBranch, Sparkles, Sliders, Sparkle, FlaskConical
 } from 'lucide-react';
 
 interface CommandPaletteProps {
@@ -15,18 +16,37 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
   const navigate = useNavigate();
 
   const commands = [
+    // Clinical Workstation
     { label: 'Clinical Dashboard', path: '/', category: 'Workstation', icon: LayoutDashboard },
     { label: 'Scan Ingestion & Triage', path: '/scans/upload', category: 'Workstation', icon: UploadCloud },
-    { label: 'Multi-View AI Analysis', path: '/analysis', category: 'Workstation', icon: Microscope },
-    { label: 'Embedding Universe 3D Manifold', path: '/embedding-universe', category: 'Research Labs', icon: Orbit },
-    { label: 'Model Courtroom Debate', path: '/model-court', category: 'Research Labs', icon: Scale },
-    { label: 'Patient Digital Twin & Progression', path: '/digital-twin', category: 'Research Labs', icon: Activity },
-    { label: 'AI Stress-Test Robustness Arena', path: '/stress-test', category: 'Research Labs', icon: Zap },
-    { label: 'Clinical Annotation Studio', path: '/annotation-studio', category: 'Research Labs', icon: PenTool },
-    { label: 'Model Registry & Benchmark Lab', path: '/models', category: 'Research Labs', icon: Cpu },
-    { label: 'Dataset Explorer & Leakage Lab', path: '/datasets', category: 'Research Labs', icon: Database },
-    { label: 'Patient Longitudinal Registry', path: '/patients', category: 'Workstation', icon: Users },
-    { label: 'Clinical Diagnostic Reports', path: '/reports', category: 'Workstation', icon: FileText },
+    { label: 'Multi-View AI Analysis & 3D GradCAM', path: '/analysis', category: 'Workstation', icon: Microscope },
+    { label: 'Longitudinal Comparison', path: '/compare', category: 'Workstation', icon: Activity },
+    { label: 'Human-in-the-Loop Review Queue', path: '/reviews', category: 'Workstation', icon: FileText },
+    { label: 'Patient Directory', path: '/patients', category: 'Workstation', icon: Users },
+    { label: 'Diagnostic PDF Reports Hub', path: '/reports', category: 'Workstation', icon: FileText },
+    { label: 'Clinical Annotation Studio', path: '/annotation-studio', category: 'Workstation', icon: PenTool },
+    { label: 'Patient Digital Twin & Progression', path: '/digital-twin', category: 'Workstation', icon: Activity },
+
+    // MediScan AI Lab
+    { label: 'MediScan AI Lab Dashboard', path: '/lab', category: 'AI Lab', icon: LayoutDashboard },
+    { label: 'Model Training Studio (PyTorch CNNs)', path: '/lab/training', category: 'AI Lab', icon: Cpu },
+    { label: 'Model Court & Consensus Arena', path: '/lab/model-court', category: 'AI Lab', icon: Scale },
+    { label: 'Explainability Lab (Multi-Method Saliency)', path: '/lab/explainability', category: 'AI Lab', icon: Eye },
+    { label: 'Trust & Failure Lab (ECE & Abstention)', path: '/lab/trust-failure', category: 'AI Lab', icon: ShieldAlert },
+    { label: 'Lesion Segmentation Lab (U-Net)', path: '/lab/segmentation', category: 'AI Lab', icon: Layers },
+    { label: 'Hidden Pattern Discovery (PCA/t-SNE)', path: '/lab/pattern-discovery', category: 'AI Lab', icon: Compass },
+    { label: 'Similar-Case Intelligence (Cosine Search)', path: '/lab/similar-cases', category: 'AI Lab', icon: GitBranch },
+    { label: 'AI Stress-Test Robustness Arena', path: '/lab/stress-test', category: 'AI Lab', icon: Zap },
+    { label: 'Dataset Quality & Leakage Scanner', path: '/lab/dataset-scanner', category: 'AI Lab', icon: Database },
+    { label: 'Experiment Studio & HPO Tuning', path: '/lab/experiments', category: 'AI Lab', icon: FlaskConical },
+    { label: 'Research Autopilot (AI Co-Scientist)', path: '/lab/autopilot', category: 'AI Lab', icon: Sparkles },
+    { label: 'Model Registry & Model Cards', path: '/lab/model-registry', category: 'AI Lab', icon: Sliders },
+    { label: 'Advanced Research Tools (24 Modules)', path: '/lab/advanced-tools', category: 'AI Lab', icon: Sparkle },
+    { label: 'Demographic Bias & Subgroup Fairness', path: '/bias-fairness', category: 'AI Lab', icon: Scale },
+
+    // Governance
+    { label: 'System Audit Logs', path: '/audit', category: 'Governance', icon: FileText },
+    { label: 'System Telemetry & Health', path: '/health', category: 'Governance', icon: Activity },
   ];
 
   const filtered = commands.filter(
@@ -40,9 +60,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         if (isOpen) onClose();
-        else {
-          // Open
-        }
       }
       if (e.key === 'Escape' && isOpen) {
         onClose();
@@ -61,7 +78,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
           <Search className="w-5 h-5 text-telemetry-cyan shrink-0" />
           <input
             type="text"
-            placeholder="Type a command, tool or screen name..."
+            placeholder="Search all 14 research workspaces, tools, or clinical routes..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoFocus
@@ -103,7 +120,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         </div>
 
         <div className="bg-matrix-black/80 px-4 py-2 border-t border-surface-border text-[10px] font-mono text-slate-500 flex justify-between">
-          <span>Navigation Shortcuts</span>
+          <span>Search 14 AI Lab Research Modules + Clinical Workstation</span>
           <span>Use <b>ESC</b> to dismiss</span>
         </div>
       </div>

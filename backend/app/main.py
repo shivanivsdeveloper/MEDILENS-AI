@@ -1,3 +1,12 @@
+import os
+import sys
+from pathlib import Path
+
+# Ensure project root is in sys.path
+project_root = Path(__file__).resolve().parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -8,6 +17,7 @@ from contextlib import asynccontextmanager
 from backend.app.config.settings import settings
 from backend.app.models.database import engine, Base, SessionLocal
 from backend.app.services.seed_service import SeedService
+from backend.app.services.auth_service import AuthService
 
 # Import routers
 from backend.app.api.routes_health import router as health_router
@@ -22,6 +32,7 @@ from backend.app.api.routes_research import router as research_router
 from backend.app.api.routes_lab import router as lab_router
 from backend.app.api.routes_annotations import router as annotations_router
 from backend.app.api.routes_drift import router as drift_router
+from backend.app.api.routes_auth import router as auth_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,6 +41,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         SeedService.seed_initial_data(db)
+        AuthService.seed_default_users(db)
     except Exception as e:
         print(f"[Warning] Seed data initialization: {e}")
     finally:
@@ -60,6 +72,7 @@ app.mount("/static/outputs", StaticFiles(directory=str(settings.OUTPUTS_DIR)), n
 app.mount("/static/reports", StaticFiles(directory=str(settings.REPORTS_DIR)), name="reports")
 
 # Include Routers
+app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
 app.include_router(health_router, prefix=settings.API_V1_PREFIX)
 app.include_router(scans_router, prefix=settings.API_V1_PREFIX)
 app.include_router(patients_router, prefix=settings.API_V1_PREFIX)
