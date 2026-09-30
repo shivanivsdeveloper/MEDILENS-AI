@@ -287,7 +287,14 @@ class SeedService:
             ]
 
             for s_spec in sample_specs:
-                s_file = s_spec["file"]
+                s_file = str(s_spec["file"])
+                s_mod = str(s_spec["mod"])
+                s_pred = str(s_spec["pred"])
+                s_conf = float(s_spec["conf"])
+                s_risk = str(s_spec["risk"])
+                s_rationale = str(s_spec["rationale"])
+                p_id = int(s_spec["p_id"]) if s_spec.get("p_id") is not None else None
+
                 src_path = settings.SAMPLE_DIR / s_file
                 scan_uid = f"SCN-{s_file.split('.')[0][-8:].upper()}"
                 dest_path = settings.UPLOAD_DIR / f"{scan_uid}.png"
@@ -298,14 +305,14 @@ class SeedService:
                 file_size = os.path.getsize(dest_path) if dest_path.exists() else 1024
 
                 scan = Scan(
-                    patient_id=s_spec["p_id"],
+                    patient_id=p_id,
                     scan_uid=scan_uid,
                     file_name=f"{scan_uid}.png",
                     file_path=str(dest_path),
                     original_file_name=s_file,
                     file_size_bytes=file_size,
                     file_format="PNG",
-                    detected_modality=s_spec["mod"],
+                    detected_modality=s_mod,
                     modality_confidence=0.95,
                     quality_score=88.5,
                     quality_category="Good",
@@ -321,23 +328,23 @@ class SeedService:
                 # Pre-populated static analysis record
                 analysis = AnalysisResult(
                     scan_id=scan.id,
-                    model_name=f"{s_spec['mod']} Screening Suite",
+                    model_name=f"{s_mod} Screening Suite",
                     model_version="2.4.1",
-                    modality=s_spec["mod"],
-                    predicted_label=s_spec["pred"],
-                    probability=s_spec["conf"],
-                    confidence_score=s_spec["conf"],
-                    uncertainty_score=round(1.0 - s_spec["conf"], 3),
+                    modality=s_mod,
+                    predicted_label=s_pred,
+                    probability=s_conf,
+                    confidence_score=s_conf,
+                    uncertainty_score=round(1.0 - s_conf, 3),
                     entropy=0.18,
                     is_ood=False,
                     ood_score=0.08,
-                    risk_indicator=s_spec["risk"],
-                    risk_rationale=s_spec["rationale"],
+                    risk_indicator=s_risk,
+                    risk_rationale=s_rationale,
                     heatmap_path=None,
                     elevation_data_path=json.dumps([]),
                     segmentation_mask_path=None,
                     measurements=json.dumps({"percentage_of_image": 11.5, "total_regions_count": 1}),
-                    all_predictions=json.dumps([{"label": s_spec["pred"], "probability": s_spec["conf"]}]),
+                    all_predictions=json.dumps([{"label": s_pred, "probability": s_conf}]),
                     ensemble_agreement=json.dumps({"consensus_ratio": 0.95, "dispute_level": "Low"}),
                     inference_time_ms=65.0,
                     is_demo_mode=True,
